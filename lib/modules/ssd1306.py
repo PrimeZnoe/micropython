@@ -93,5 +93,13 @@ class SSD1306:
     def scroll(self, dx, dy):
         self.framebuf.scroll(dx, dy)
 
-    def text(self, string, x, y, col=1):
-        self.framebuf.text(string, x, y, col)
+    def text(self, text, x, y, col=1, line_height=8):
+        max_chars = self.width // 8  # Maximale Zeichen pro Zeile bei 8 Pixel Breite pro Zeichen
+        lines = [text[i:i+max_chars] for i in range(0, len(text), max_chars)]
+        
+        for i, line in enumerate(lines):
+            line_y = y + i * line_height
+            if line_y + line_height > self.height:  # Überprüfe, ob die nächste Zeile noch ins Display passt
+                break  # Beende, wenn die maximale Höhe überschritten wird
+            self.framebuf.text(line, x, line_y, col)
+        self.show()
