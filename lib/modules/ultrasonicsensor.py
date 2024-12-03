@@ -1,37 +1,37 @@
 import time
 from machine import Pin
 
-class UltrasonicSensor:
-    def __init__(self, trig_pin, echo_pin):
-        # Trigger- und Echo-Pins einrichten
-        self.trig = Pin(trig_pin, Pin.OUT)
+class DistanceSensor:
+    def __init__(self, trigger_pin, echo_pin):
+        self.trigger = Pin(trigger_pin, Pin.OUT)
         self.echo = Pin(echo_pin, Pin.IN)
-        
-    def measure_distance(self):
-        # Trigger-Puls senden
-        self.trig.low()
+        self.trigger.low()
+
+    def get_distance(self):
+        self.trigger.low()
         time.sleep_us(2)
-        self.trig.high()
+        self.trigger.high()
         time.sleep_us(10)
-        self.trig.low()
+        self.trigger.low()
 
-        # Echo-Zeit messen
+        pulse_start = 0
+        pulse_end = 0
         while self.echo.value() == 0:
-            signal_off = time.ticks_us()
+            pulse_start = time.ticks_us()
         while self.echo.value() == 1:
-            signal_on = time.ticks_us()
+            pulse_end = time.ticks_us()
 
-        # Zeitdifferenz und Entfernung berechnen
-        time_passed = time.ticks_diff(signal_on, signal_off)
-        distance_cm = (time_passed * 0.0343) / 2
+        duration = time.ticks_diff(pulse_end, pulse_start)
+        distance = (duration * 0.0343) / 2
 
-        return distance_cm
+        return distance
 
-# Beispiel für die Nutzung:
-# Sensor erstellen und Pins anpassen
-sensor = UltrasonicSensor(trig_pin=16, echo_pin=17)
-
-while True:
-    dist = sensor.measure_distance()
-    print("Entfernung: {:.2f} cm".format(dist))
-    time.sleep(1)
+    def safe_measurement(self):
+        try:
+            distance = self.get_distance()
+            if 0 < distance < 400:
+                return distance
+            else:
+                return -1
+        except Exception as e:
+            return -1
