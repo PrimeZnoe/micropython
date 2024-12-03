@@ -1,105 +1,101 @@
-# ssd1306.py
-
 from micropython import const
 import framebuf
 
-# Register definitions
-SET_CONTRAST = const(0x81)
-SET_ENTIRE_ON = const(0xA4)
-SET_NORM_INV = const(0xA6)
-SET_DISP = const(0xAE)
-SET_MEM_ADDR = const(0x20)
-SET_COL_ADDR = const(0x21)
-SET_PAGE_ADDR = const(0x22)
-SET_DISP_START_LINE = const(0x40)
-SET_SEG_REMAP = const(0xA0)
-SET_MUX_RATIO = const(0xA8)
-SET_COM_OUT_DIR = const(0xC0)
-SET_DISP_OFFSET = const(0xD3)
-SET_COM_PIN_CFG = const(0xDA)
-SET_DISP_CLK_DIV = const(0xD5)
-SET_PRECHARGE = const(0xD9)
-SET_VCOM_DESEL = const(0xDB)
-SET_CHARGE_PUMP = const(0x8D)
+CONTRAST_LEVEL = const(0x81)
+DISPLAY_ALL_ON = const(0xA4)
+NORMAL_DISPLAY = const(0xA6)
+DISPLAY_POWER = const(0xAE)
+ADDRESSING_MODE = const(0x20)
+COLUMN_ADDRESS = const(0x21)
+PAGE_ADDRESS = const(0x22)
+START_LINE = const(0x40)
+REMAP_COLUMNS = const(0xA0)
+MUX_RATIO = const(0xA8)
+SCAN_DIRECTION = const(0xC0)
+DISPLAY_OFFSET = const(0xD3)
+PIN_CONFIGURATION = const(0xDA)
+CLK_DIV_RATIO = const(0xD5)
+PRECHARGE_PERIOD = const(0xD9)
+VCOMH_DESELECT = const(0xDB)
+CHARGE_PUMP = const(0x8D)
 
-class SSD1306:
-    def __init__(self, width, height, i2c, addr=0x3C, external_vcc=False):
+class OLEDDisplay:
+    def __init__(self, width, height, i2c_bus, address=0x3C, external_power=False):
         self.width = width
         self.height = height
-        self.i2c = i2c
-        self.addr = addr
-        self.external_vcc = external_vcc
+        self.i2c = i2c_bus
+        self.address = address
+        self.external_power = external_power
         self.buffer = bytearray(self.height * self.width // 8)
-        self.framebuf = framebuf.FrameBuffer(self.buffer, self.width, self.height, framebuf.MONO_VLSB)
-        self.init_display()
+        self.framebuffer = framebuf.FrameBuffer(
+            self.buffer, self.width, self.height, framebuf.MONO_VLSB
+        )
+        self.initialize()
 
-    def init_display(self):
-        self.write_cmd(SET_DISP | 0x00)  # display off
-        self.write_cmd(SET_MEM_ADDR)
-        self.write_cmd(0x00)  # horizontal addressing mode
-        self.write_cmd(SET_DISP_START_LINE | 0x00)
-        self.write_cmd(SET_SEG_REMAP | 0x01)  # column addr 127 mapped to SEG0
-        self.write_cmd(SET_MUX_RATIO)
-        self.write_cmd(self.height - 1)
-        self.write_cmd(SET_COM_OUT_DIR | 0x08)  # scan from COM[N] to COM0
-        self.write_cmd(SET_DISP_OFFSET)
-        self.write_cmd(0x00)
-        self.write_cmd(SET_COM_PIN_CFG)
-        if self.height == 32:
-            self.write_cmd(0x02)
-        elif self.height == 64:
-            self.write_cmd(0x12)
-        self.write_cmd(SET_CONTRAST)
-        self.write_cmd(0x7F)
-        self.write_cmd(SET_PRECHARGE)
-        self.write_cmd(0x22 if self.external_vcc else 0xF1)
-        self.write_cmd(SET_VCOM_DESEL)
-        self.write_cmd(0x30)  # 0.83*Vcc
-        self.write_cmd(SET_CHARGE_PUMP)
-        self.write_cmd(0x10 if self.external_vcc else 0x14)
-        self.write_cmd(SET_DISP | 0x01)  # display on
+    def initialize(self):
+        self.send_command(DISPLAY_POWER | 0x00)
+        self.send_command(ADDRESSING_MODE)
+        self.send_command(0x00)
+        self.send_command(START_LINE | 0x00)
+        self.send_command(REMAP_COLUMNS | 0x01)
+        self.send_command(MUX_RATIO)
+        self.send_command(self.height - 1)
+        self.send_command(SCAN_DIRECTION | 0x08)
+        self.send_command(DISPLAY_OFFSET)
+        self.send_command(0x00)
+        self.send_command(PIN_CONFIGURATION)
+        self.send_command(0x02 if self.height == 32 else 0x12)
+        self.send_command(CONTRAST_LEVEL)
+        self.send_command(0x7F)
+        self.send_command(PRECHARGE_PERIOD)
+        self.send_command(0x22 if self.external_power else 0xF1)
+        self.send_command(VCOMH_DESELECT)
+        self.send_command(0x30)
+        self.send_command(CHARGE_PUMP)
+        self.send_command(0x10 if self.external_power else 0x14)
+        self.send_command(DISPLAY_POWER | 0x01)
 
-    def write_cmd(self, cmd):
-        self.i2c.writeto(self.addr, b'\x00' + bytearray([cmd]))
+    def send_command(self, cmd):
+        self.i2c.writeto(self.address, b'\x00' + bytearray([cmd]))
 
-    def poweroff(self):
-        self.write_cmd(SET_DISP | 0x00)
+    def turn_off(self):
+        self.send_command(DISPLAY_POWER | 0x00)
 
-    def poweron(self):
-        self.write_cmd(SET_DISP | 0x01)
+    def turn_on(self):
+        self.send_command(DISPLAY_POWER | 0x01)
 
-    def contrast(self, contrast):
-        self.write_cmd(SET_CONTRAST)
-        self.write_cmd(contrast)
+    def adjust_contrast(self, level):
+        self.send_command(CONTRAST_LEVEL)
+        self.send_command(level)
 
-    def invert(self, invert):
-        self.write_cmd(SET_NORM_INV | (invert & 1))
+    def invert_display(self, invert):
+        self.send_command(NORMAL_DISPLAY | (invert & 1))
 
-    def show(self):
-        self.write_cmd(SET_COL_ADDR)
-        self.write_cmd(0)
-        self.write_cmd(self.width - 1)
-        self.write_cmd(SET_PAGE_ADDR)
-        self.write_cmd(0)
-        self.write_cmd(self.height // 8 - 1)
-        self.i2c.writeto(self.addr, b'\x40' + self.buffer)
+    def update_display(self):
+        self.send_command(COLUMN_ADDRESS)
+        self.send_command(0)
+        self.send_command(self.width - 1)
+        self.send_command(PAGE_ADDRESS)
+        self.send_command(0)
+        self.send_command(self.height // 8 - 1)
+        self.i2c.writeto(self.address, b'\x40' + self.buffer)
 
-    def fill(self, col):
-        self.framebuf.fill(col)
+    def clear(self, color):
+        self.framebuffer.fill(color)
 
-    def pixel(self, x, y, col):
-        self.framebuf.pixel(x, y, col)
+    def draw_pixel(self, x, y, color):
+        self.framebuffer.pixel(x, y, color)
 
-    def scroll(self, dx, dy):
-        self.framebuf.scroll(dx, dy)
+    def scroll_display(self, dx, dy):
+        self.framebuffer.scroll(dx, dy)
 
-    def text(self, text, x, y, col=1, line_height=8):
-        max_chars = self.width // 8  # Maximale Zeichen pro Zeile bei 8 Pixel Breite pro Zeichen
-        lines = [text[i:i+max_chars] for i in range(0, len(text), max_chars)]
+    def write_text(self, text, x, y, color=1, line_height=8):
+        max_chars_per_line = self.width // 8
+        lines = [text[i:i+max_chars_per_line] for i in range(0, len(text), max_chars_per_line)]
         
         for i, line in enumerate(lines):
             line_y = y + i * line_height
-            if line_y + line_height > self.height:  # Überprüfe, ob die nächste Zeile noch ins Display passt
-                break  # Beende, wenn die maximale Höhe überschritten wird
-            self.framebuf.text(line, x, line_y, col)
-        self.show()
+            if line_y + line_height > self.height:
+                break
+            self.framebuffer.text(line, x, line_y, color)
+        self.update_display()
